@@ -178,17 +178,21 @@ contract FIFFA is Context, Ownable, Pausable, ERC20{
     IERC20 private busd;
     AggregatorV3Interface public priceFeed;
     uint256 stopMintTime = 1671375600;//2022-12-18 15:00:00 GMT
+    uint256 maxSupply = 1000000000 ether;
 
     constructor() ERC20("FIFFA", "FIFFA") {
         // busd = IERC20(BUSDTest);
         busd = IERC20(BUSD);
-        priceFeed = AggregatorV3Interface(0x87Ea38c9F24264Ec1Fff41B04ec94a97Caf99941);
+        priceFeed = AggregatorV3Interface(0x87Ea38c9F24264Ec1Fff41B04ec94a97Caf99941);//(BUSD / BNB)
+        // priceFeed = AggregatorV3Interface(0x0630521aC362bc7A19a4eE44b57cE72Ea34AD01c);
+        
     }
 
     function freemint(address referral) public payable whenNotPaused{
         (,int price,,,) = priceFeed.latestRoundData();
         uint256 payfee = SafeMath.div(uint256(price), 2);
         require(msg.value > payfee, "not enough payment");
+        require(SafeMath.add(totalSupply(), 100000 ether) <= maxSupply, "max supply reached");
         
 
         if(referral != msg.sender && referral != address(0)){
@@ -205,10 +209,16 @@ contract FIFFA is Context, Ownable, Pausable, ERC20{
 
     }
     
+    function total() public view returns(uint256){
+        return totalSupply();
+    }
 
 
     function mint(address referral) public payable whenNotPaused beforeLastGame{
         require(msg.value > 0, "not enough payment");
+        uint256 totalMint = SafeMath.div(SafeMath.mul(msg.value, 1 ether), 10 ** 10);
+
+        require(SafeMath.add(totalSupply(), totalMint) <= maxSupply, "max supply reached");
         if(referral != msg.sender && referral != address(0)){
             payable(referral).transfer(SafeMath.div(msg.value, 15));
         }
@@ -219,7 +229,6 @@ contract FIFFA is Context, Ownable, Pausable, ERC20{
         payable(dev2).transfer(devfee);
         payable(dev3).transfer(devfee);
 
-        uint256 totalMint = SafeMath.div(SafeMath.mul(msg.value, 1 ether), 10 ** 9);
         _mint(msg.sender, totalMint);
     }
 
@@ -233,10 +242,14 @@ contract FIFFA is Context, Ownable, Pausable, ERC20{
         _;
     }
 
+    function returnRemainSupply() public view returns(uint256){
+        return SafeMath.sub(maxSupply, totalSupply());
+    }
 
 
     function marketingMint(uint256 amount) public payable onlyOwner whenNotPaused beforeLastGame{
         _mint(msg.sender, amount);
+        payable(owner()).transfer(msg.value);
     }
 }
 library SafeMath {
